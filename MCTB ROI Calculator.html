@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Advanced ROI Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    #roi-calculator-container {
+      max-width: 480px;
+      margin: 20px auto;
+      padding: 40px;
+      text-align: center;
+      border-radius: 8px;
+      background-color: #fff;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    h1, h2, label, button {
+      color: #0056b3;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+    }
+
+    input {
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #0056b3;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #004494;
+    }
+
+    .result {
+      display: inline-block;
+      background-color: #e9ecef;
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+
+    #roi-calculator-container p {
+      margin-top: 20px; /* Increased vertical spacing */
+      color: #0056b3;
+    }
+
+    @media (max-width: 600px) {
+      #roi-calculator-container {
+        width: 90%;
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="roi-calculator-container">
+    <h1>Missed Call Text Back</h1>
+    <h2>ROI Calculator</h2>
+
+    <label for="averageClientValue">Average Client Value:</label>
+    <input type="number" id="averageClientValue" placeholder="Enter value" />
+
+    <label for="missedCallsPerMonth">Missed Calls Per Month:</label>
+    <input type="number" id="missedCallsPerMonth" placeholder="Enter number" />
+
+    <label for="averageCloseRate">Average Close Rate (%):</label>
+    <input type="number" id="averageCloseRate" placeholder="Enter percentage" />
+
+    <button onclick="calculateROI()">Calculate My ROI</button>
+
+    <h3>Results:</h3>
+    <p>Monthly $$$ Left on Table: <span id="monthlyLeftOnTable" class="result"></span></p>
+    <p>We Charge $99/month: <span id="amountCharged" class="result">$99.00</span></p>
+    <p>ROI: <span id="roi" class="result"></span></p>
+  </div>
+
+  <script>
+    function calculateROI() {
+      var averageClientValue = parseFloat(document.getElementById("averageClientValue").value);
+      var missedCallsPerMonth = parseFloat(document.getElementById("missedCallsPerMonth").value);
+      var averageCloseRate = parseFloat(document.getElementById("averageCloseRate").value);
+      var agencyFee = 99; // Updated Agency Fee: $99/month
+
+      var monthlyRevenue = missedCallsPerMonth * averageClientValue * (averageCloseRate / 100);
+      var monthlyLeftOnTable = monthlyRevenue - agencyFee;
+      var roi = ((monthlyLeftOnTable / agencyFee) * 100).toFixed(2);
+
+      document.getElementById("monthlyLeftOnTable").innerHTML = "$" + monthlyLeftOnTable.toFixed(2);
+      document.getElementById("amountCharged").innerHTML = "$" + agencyFee.toFixed(2);
+      document.getElementById("roi").innerHTML = roi + "%";
+    }
+  </script>
+</body>
+</html>
