@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, Clock, TrendingUp, MessageSquare } from 'lucide-react';
+import { Phone, Clock, TrendingUp } from 'lucide-react'; // Removed MessageSquare icon
 import { TimeFrame, CallData } from '../types';
 
 interface MetricsGridProps {
@@ -22,12 +22,6 @@ export default function MetricsGrid({ timeFrame, calls }: MetricsGridProps) {
     const resolutionRate = totalCalls > 0
       ? Math.round((completedCalls / totalCalls) * 100)
       : 0;
-    
-    // Calculate customer satisfaction (based on positive sentiment percentage)
-    const positiveCalls = calls.filter(call => call.sentiment === 'positive').length;
-    const satisfaction = totalCalls > 0
-      ? Math.round((positiveCalls / totalCalls) * 5 * 10) / 10
-      : 0;
 
     return [
       {
@@ -47,12 +41,6 @@ export default function MetricsGrid({ timeFrame, calls }: MetricsGridProps) {
         value: resolutionRate,
         change: 0,
         icon: <TrendingUp className="h-6 w-6 text-blue-600" />,
-      },
-      {
-        title: 'Customer Satisfaction',
-        value: satisfaction,
-        change: 0,
-        icon: <MessageSquare className="h-6 w-6 text-purple-600" />,
       },
     ];
   };
@@ -79,8 +67,7 @@ export default function MetricsGrid({ timeFrame, calls }: MetricsGridProps) {
           <p className="mt-1 text-2xl font-semibold text-gray-900">
             {metric.value}
             {metric.title === 'Avg. Handle Time' ? 's' : 
-              metric.title === 'Resolution Rate' ? '%' : 
-              metric.title === 'Customer Satisfaction' ? '/5' : ''}
+              metric.title === 'Resolution Rate' ? '%' : ''}
           </p>
           <p className="mt-1 text-sm text-gray-500">
             {timeFrame} overview
