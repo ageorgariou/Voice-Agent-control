@@ -6,6 +6,15 @@ interface LoginProps {
   onLogin: (username: string) => void;
 }
 
+interface User {
+  username: string;
+  password: string;
+  name: string;
+  email: string;
+  airtableBaseName: string;
+  createdAt: string;
+}
+
 export default function Login({ onLogin }: LoginProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [username, setUsername] = useState('');
@@ -54,28 +63,78 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
+  const validateSignUp = () => {
+    // Password validation
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    // Passcode validation
+    if (passcode !== '123456') {
+      setError('Invalid passcode');
+      return false;
+    }
+
+    // Get existing users
+    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+
+    // Check for duplicate username
+    if (existingUsers.some((user: User) => user.username === username)) {
+      setError('Sorry unfortunately this username is already taken.');
+      return false;
+    }
+
+    // Check for duplicate email
+    if (existingUsers.some((user: User) => user.email === email)) {
+      setError('The email address you entered is already associated with an existing account. Please use a different email address or log in to your account.');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (isSignUp) {
-      // Handle sign up
-      if (passcode !== '123456') {
-        setError('Invalid passcode');
+      // Validate sign up form
+      if (!validateSignUp()) {
         return;
       }
 
-      if (!email.includes('@')) {
-        setError('Please enter a valid email');
-        return;
-      }
+      // Create new user
+      const newUser: User = {
+        username,
+        password,
+        name: username,
+        email,
+        airtableBaseName: 'Sabos Account',
+        createdAt: new Date().toISOString()
+      };
 
-      // Store user data in localStorage
-      localStorage.setItem('userName', username);
-      localStorage.setItem('userEmail', email);
-      localStorage.setItem('userPassword', password);
+      // Get existing users and save new user
+      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+      localStorage.setItem('users', JSON.stringify([...existingUsers, newUser]));
+      localStorage.setItem('currentUser', JSON.stringify(newUser));
       onLogin(username);
     } else {
+      // Special case for admin login
+      if (username === 'admin' && password === '12345') {
+        localStorage.setItem('userName', username);
+        localStorage.setItem('userPassword', password);
+        onLogin(username);
+        return;
+      }
+
       if (is2FAStep) {
         // Verify 2FA code
         if (verificationCode === generatedCode) {
@@ -86,38 +145,30 @@ export default function Login({ onLogin }: LoginProps) {
         return;
       }
 
-      // Handle initial login
-      const storedUsername = localStorage.getItem('userName');
-      const storedPassword = localStorage.getItem('userPassword');
-      const storedEmail = localStorage.getItem('userEmail');
+      // Get users from localStorage
+      const users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+      const user = users.find(u => u.username === username && u.password === password);
 
-      if ((username === storedUsername && password === storedPassword) || 
-          (username === 'admin' && password === '12345')) {
+      if (user) {
+        // Check if user has 2FA enabled
+        const is2FAEnabled = localStorage.getItem('2FAEnabled') === 'true';
         
-        // Generate and send 2FA code
+        if (!is2FAEnabled) {
+          // If 2FA is disabled, log in directly
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          onLogin(username);
+          return;
+        }
+
+        // If 2FA is enabled, continue with verification process
         const code = generateVerificationCode();
         setGeneratedCode(code);
         
-        // Get the correct email based on the login type
-        let emailToUse;
-        if (username === 'admin') {
-          emailToUse = 'admin@example.com';
-        } else {
-          // Find the email associated with this username
-          emailToUse = localStorage.getItem('userEmail');
-          if (!emailToUse) {
-            setError('No email found for this account');
-            return;
-          }
-        }
-
-        console.log('Attempting to send email to:', emailToUse); // Debug log
-        
-        const emailSent = await sendVerificationEmail(emailToUse, code);
+        const emailSent = await sendVerificationEmail(user.email, code);
 
         if (emailSent) {
           setIs2FAStep(true);
-          setError('Verification code sent to ' + emailToUse); // Show user where the code was sent
+          setError('Verification code sent to ' + user.email);
           setTimeout(() => setError(''), 5000);
         } else {
           setError('Failed to send verification code. Please try again.');

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, Calculator, MessageSquare, FileText, Users } from 'lucide-react';
+import { Menu, X, Calculator, MessageSquare, FileText, Users, Settings, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface SideMenuProps {
@@ -8,53 +8,73 @@ interface SideMenuProps {
 }
 
 export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
-  const menuItems = [
-    { icon: <Calculator className="h-5 w-5" />, label: 'ROI Calculator', path: '/roi-calculator' },
-    { icon: <MessageSquare className="h-5 w-5" />, label: 'Automated SMS', path: '/automated-sms' },
-    { icon: <FileText className="h-5 w-5" />, label: 'Contract Forms', path: '/contract-forms' },
-    { icon: <Users className="h-5 w-5" />, label: 'Contact Manager', path: '/contact-manager' },
-  ];
+  const isAdmin = localStorage.getItem('userName') === 'admin' && 
+                 localStorage.getItem('userPassword') === '12345';
 
   return (
-    <>
-      {/* Overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
+    <div
+      className={`fixed inset-y-0 left-0 transform ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-8">
-            <span className="text-xl font-semibold text-gray-900">Menu</span>
-            <button 
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-gray-100"
-            >
-              <X className="h-6 w-6 text-gray-500" />
-            </button>
-          </div>
+      } w-64 bg-white shadow-lg transition-transform duration-200 ease-in-out z-30`}
+    >
+      <div className="p-6">
+        <button onClick={onClose} className="absolute top-4 right-4">
+          <X className="h-6 w-6 text-gray-500" />
+        </button>
 
-          <nav className="space-y-2">
-            {menuItems.map((item) => (
-              <Link
-                key={item.label}
-                to={item.path}
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-50 w-full"
-                onClick={onClose}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
-            ))}
-          </nav>
-        </div>
+        <nav className="mt-8 space-y-2">
+          <Link
+            to="/"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <Home className="h-5 w-5" />
+            <span>Home</span>
+          </Link>
+          <Link
+            to="/roi-calculator"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <Calculator className="h-5 w-5" />
+            <span>ROI Calculator</span>
+          </Link>
+          <Link
+            to="/automated-sms"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <MessageSquare className="h-5 w-5" />
+            <span>Automated SMS</span>
+          </Link>
+          <Link
+            to="/contract-forms"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <FileText className="h-5 w-5" />
+            <span>Contract Forms</span>
+          </Link>
+          <Link
+            to="/contact-manager"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <Users className="h-5 w-5" />
+            <span>Contact Manager</span>
+          </Link>
+          {isAdmin && (
+            <Link
+              to="/management"
+              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 bg-gray-50"
+              onClick={onClose}
+            >
+              <Settings className="h-5 w-5" />
+              <span>Management</span>
+            </Link>
+          )}
+        </nav>
       </div>
-    </>
+    </div>
   );
 } 

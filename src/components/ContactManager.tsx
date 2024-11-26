@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Upload, Download, Search, Users } from 'lucide-react';
+import { ArrowLeft, Upload, Download, Search, Users, RefreshCw } from 'lucide-react';
 import Papa from 'papaparse';
+import Airtable from 'airtable';
 
 interface Contact {
   id: string;
   name: string;
   email: string;
+  ssn: string;
+  bookingTime?: string;
 }
 
 export default function ContactManager() {
@@ -14,12 +17,12 @@ export default function ContactManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check if it's a CSV file
     if (!file.name.endsWith('.csv')) {
       setError('Please upload a CSV file');
       return;
@@ -34,6 +37,7 @@ export default function ContactManager() {
             id: Math.random().toString(36).substr(2, 9),
             name: row.name || row.Name || '',
             email: row.email || row.Email || '',
+            ssn: row.ssn || row.SSN || row['Social Security'] || '',
           }));
 
         setContacts(parsedContacts);
@@ -59,10 +63,58 @@ export default function ContactManager() {
     document.body.removeChild(link);
   };
 
+  const updateContactsFromAirtable = async () => {
+    setIsImporting(true);
+    setError('');
+    
+    try {
+      const base = new Airtable({
+        apiKey: import.meta.env.VITE_AIRTABLE_API_KEY
+      }).base(import.meta.env.VITE_AIRTABLE_BASE_ID);
+
+      const baseName = localStorage.getItem('airtableBaseName') || 'Sabos Account';
+
+      const records = await new Promise<Airtable.Records<any>>((resolve, reject) => {
+        const records: Airtable.Record<any>[] = [];
+        base(baseName)
+          .select({
+            view: 'Grid view'
+          })
+          .eachPage(
+            function page(pageRecords, fetchNextPage) {
+              records.push(...pageRecords);
+              fetchNextPage();
+            },
+            function done(err) {
+              if (err) reject(err);
+              else resolve(records);
+            }
+          );
+      });
+
+      const airtableContacts = records.map(record => ({
+        id: record.id,
+        name: record.get('Name') || '',
+        email: record.get('Email') || '',
+        ssn: record.get('Social Security') || '',
+        bookingTime: record.get('Booking Time')
+      }));
+
+      setContacts(airtableContacts);
+      setSuccess(`Successfully imported ${airtableContacts.length} contacts from Airtable`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Error importing from Airtable: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const filteredContacts = contacts.filter(
     contact =>
       contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchQuery.toLowerCase())
+      contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.ssn.includes(searchQuery)
   );
 
   return (
@@ -127,6 +179,18 @@ export default function ContactManager() {
                 <Download className="h-5 w-5" />
                 <span>Export CSV</span>
               </button>
+              <button
+                onClick={updateContactsFromAirtable}
+                disabled={isImporting}
+                className={`flex items-center space-x-2 px-4 py-2 border rounded-lg 
+                  ${isImporting
+                    ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+              >
+                <RefreshCw className={`h-5 w-5 ${isImporting ? 'animate-spin' : ''}`} />
+                <span>{isImporting ? 'Importing...' : 'Import from Airtable'}</span>
+              </button>
             </div>
 
             <div className="relative">
@@ -152,6 +216,9 @@ export default function ContactManager() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Email
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Social Security
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -159,6 +226,9 @@ export default function ContactManager() {
                   <tr key={contact.id}>
                     <td className="px-6 py-4 whitespace-nowrap">{contact.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{contact.email}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {contact.ssn ? `***-**-${contact.ssn.slice(-4)}` : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>
