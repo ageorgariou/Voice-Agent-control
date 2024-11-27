@@ -33,6 +33,8 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
     email?: string;
     username?: string;
   }>({});
+  const isAdmin = localStorage.getItem('userName') === 'admin' && 
+                 localStorage.getItem('userPassword') === '12345';
 
   useEffect(() => {
     if (user) {
@@ -234,8 +236,23 @@ export default function Management() {
     setUsers(newUsers);
   };
 
-  const handleCreateUser = (user: User) => {
-    saveUsers([...users, user]);
+  const handleCreateUser = (newUser: User) => {
+    // Get existing users
+    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+    
+    // Create new user with 2FA disabled and no API key
+    const userToAdd = {
+      ...newUser,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Save the new user
+    localStorage.setItem('users', JSON.stringify([...existingUsers, userToAdd]));
+    
+    // Set user-specific settings
+    localStorage.setItem(`2FA_${newUser.username}`, 'false');
+    localStorage.setItem(`vapiKey_${newUser.username}`, ''); // Initialize empty API key for this user
+    
     setIsModalOpen(false);
   };
 

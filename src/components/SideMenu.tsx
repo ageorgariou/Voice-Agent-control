@@ -23,6 +23,10 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
         </button>
 
         <nav className="mt-8 space-y-2">
+          <div className="px-4 py-3 mb-4 bg-indigo-50 rounded-lg">
+            <span className="text-lg font-semibold text-indigo-600">mrceeschatbot</span>
+          </div>
+
           <Link
             to="/"
             className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
@@ -66,7 +70,7 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
           {isAdmin && (
             <Link
               to="/management"
-              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100 bg-gray-50"
+              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
               onClick={onClose}
             >
               <Settings className="h-5 w-5" />

@@ -12,7 +12,7 @@ export default function TranscriptDetailsModal({ call, onClose }: TranscriptDeta
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-semibold text-gray-900">Call Details</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
@@ -20,7 +20,7 @@ export default function TranscriptDetailsModal({ call, onClose }: TranscriptDeta
           </button>
         </div>
         
-        <div className="p-6 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="flex items-center space-x-2 bg-gray-50 p-4 rounded-lg">
               <Clock className="h-5 w-5 text-gray-400" />
@@ -40,7 +40,7 @@ export default function TranscriptDetailsModal({ call, onClose }: TranscriptDeta
 
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">Transcript</h3>
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-gray-50 p-4 rounded-lg max-h-[40vh] overflow-y-auto">
               <p className="text-gray-700 whitespace-pre-wrap">{call.transcript}</p>
             </div>
           </div>

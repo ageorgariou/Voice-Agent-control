@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, Search, Filter, LogOut, Menu } from 'lucide-react';
+import { Search, Filter, LogOut, Menu } from 'lucide-react';
 import MetricsGrid from './MetricsGrid';
 import CallsChart from './CallsChart';
 import TranscriptList from './TranscriptList';
@@ -9,6 +9,7 @@ import { TimeFrame, CallData, FilterOption } from '../types';
 import { fetchCalls } from '../services/vapiServices';
 import FilterMenu from './FilterMenu';
 import SideMenu from './SideMenu';
+import ApiKeyPrompt from './ApiKeyPrompt';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -23,6 +24,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<FilterOption[]>([]);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [showApiKeyPrompt, setShowApiKeyPrompt] = useState(false);
 
   useEffect(() => {
     const loadCalls = async () => {
@@ -30,6 +32,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         setIsLoading(true);
         setError(null);
         
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const userApiKey = localStorage.getItem(`vapiKey_${currentUser.username}`);
+        
+        if (!userApiKey) {
+          setError('API key not found');
+          setIsLoading(false);
+          return;
+        }
+
         const now = new Date();
         let from = new Date();
         
@@ -51,7 +62,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         const fetchedCalls = await fetchCalls(
           { from: from.toISOString(), to: now.toISOString() },
           1,
-          100
+          100,
+          userApiKey
         );
         setCalls(fetchedCalls);
       } catch (err) {
@@ -63,6 +75,23 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
     loadCalls();
   }, [timeFrame]);
+
+  useEffect(() => {
+    // Get current user
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    
+    // Check for user-specific API key
+    const userApiKey = localStorage.getItem(`vapiKey_${currentUser.username}`);
+    if (!userApiKey) {
+      setShowApiKeyPrompt(true);
+    }
+  }, []);
+
+  const handleApiKeySubmit = (apiKey: string) => {
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    localStorage.setItem(`vapiKey_${currentUser.username}`, apiKey);
+    setShowApiKeyPrompt(false);
+  };
 
   const getFilteredCalls = () => {
     let filtered = calls;
@@ -94,10 +123,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               >
                 <Menu className="h-6 w-6" />
               </button>
-              <div className="flex items-center">
-                <Phone className="h-8 w-8 text-indigo-600" />
-                <span className="ml-2 text-xl font-semibold text-gray-900">VoiceMetrics</span>
-              </div>
             </div>
             <div className="flex items-center space-x-4">
               <button 
@@ -181,6 +206,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {showApiKeyPrompt && <ApiKeyPrompt onSubmit={handleApiKeySubmit} />}
     </div>
   );
 }

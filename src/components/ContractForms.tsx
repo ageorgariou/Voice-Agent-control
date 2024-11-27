@@ -12,8 +12,11 @@ interface SavedContract {
   id: string;
   title: string;
   date: string;
-  document: File;
+  document: string;
+  fileName: string;
+  fileType: string;
   uploadedAt: Date;
+  uploadedBy: string;
 }
 
 interface FormErrors {
@@ -30,7 +33,8 @@ export default function ContractForms() {
   });
 
   const [savedContracts, setSavedContracts] = useState<SavedContract[]>(() => {
-    const saved = localStorage.getItem('contracts');
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const saved = localStorage.getItem(`contracts_${currentUser.username}`);
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -41,7 +45,8 @@ export default function ContractForms() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    localStorage.setItem('contracts', JSON.stringify(savedContracts));
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    localStorage.setItem(`contracts_${currentUser.username}`, JSON.stringify(savedContracts));
   }, [savedContracts]);
 
   const allowedFileTypes = [
@@ -76,18 +81,48 @@ export default function ContractForms() {
     return isValid;
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const base64toBlob = (base64Data: string, contentType: string): Blob => {
+    const byteCharacters = atob(base64Data.split(',')[1]);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage('');
 
     if (validateForm()) {
       try {
+        const base64Document = await fileToBase64(formData.document!);
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        
         const newContract: SavedContract = {
           id: Date.now().toString(),
           title: formData.title,
           date: formData.date,
-          document: formData.document!,
-          uploadedAt: new Date()
+          document: base64Document,
+          fileName: formData.document!.name,
+          fileType: formData.document!.type,
+          uploadedAt: new Date(),
+          uploadedBy: currentUser.username
         };
 
         setSavedContracts(prev => [newContract, ...prev]);
@@ -152,7 +187,8 @@ export default function ContractForms() {
   };
 
   const handlePreview = (contract: SavedContract) => {
-    const url = URL.createObjectURL(contract.document);
+    const blob = base64toBlob(contract.document, contract.fileType);
+    const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
     URL.revokeObjectURL(url);
   };
@@ -166,9 +202,11 @@ export default function ContractForms() {
   };
 
   const filteredContracts = savedContracts
-    .filter(contract => 
-      contract.title.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    .filter(contract => {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      return contract.uploadedBy === currentUser.username &&
+        contract.title.toLowerCase().includes(searchQuery.toLowerCase());
+    })
     .sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();

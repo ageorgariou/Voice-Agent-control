@@ -18,13 +18,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const isAdmin = localStorage.getItem('userName') === 'admin';
 
   useEffect(() => {
-    setName(localStorage.getItem('userName') || '');
-    setEmail(localStorage.getItem('userEmail') || '');
-    setApiKey(localStorage.getItem('vapiKey') || '');
+    // Get current user data
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    
+    setName(currentUser.name || '');
+    setEmail(currentUser.email || '');
+    setApiKey(localStorage.getItem(`vapiKey_${currentUser.username}`) || '');
     setAvatar(localStorage.getItem('userAvatar') || '');
-    setAirtableBaseName(localStorage.getItem('airtableBaseName') || 'Sabos Account');
-    setIs2FAEnabled(localStorage.getItem('2FAEnabled') === 'true');
-  }, [isOpen]);
+    setIs2FAEnabled(localStorage.getItem(`2FA_${currentUser.username}`) === 'true');
+    
+    // Only set Airtable base name for admin
+    if (isAdmin) {
+      setAirtableBaseName(localStorage.getItem('airtableBaseName') || 'Sabos Account');
+    }
+  }, [isOpen, isAdmin]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -73,17 +80,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       // Save everything to localStorage
       localStorage.setItem('users', JSON.stringify(updatedUsers));
       localStorage.setItem('currentUser', JSON.stringify(updatedCurrentUser));
-    }
 
-    // Update other settings
-    localStorage.setItem('userName', name);
-    localStorage.setItem('userEmail', email);
-    localStorage.setItem('vapiKey', apiKey);
-    localStorage.setItem('userAvatar', avatar);
-    localStorage.setItem('2FAEnabled', is2FAEnabled.toString());
-    
-    if (isAdmin) {
-      localStorage.setItem('airtableBaseName', airtableBaseName);
+      // Save user-specific settings
+      localStorage.setItem(`vapiKey_${currentUser.username}`, apiKey);
+      localStorage.setItem('userAvatar', avatar);
+      localStorage.setItem(`2FA_${currentUser.username}`, is2FAEnabled.toString());
+      
+      if (isAdmin) {
+        localStorage.setItem('airtableBaseName', airtableBaseName);
+      }
     }
 
     onClose();

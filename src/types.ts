@@ -22,3 +22,14 @@ export interface MetricCard {
 }
 
 export type FilterOption = 'Completed' | 'Follow Up Required' | 'Not interested';
+
+export interface SavedContract {
+  id: string;
+  title: string;
+  date: string;
+  document: string;
+  fileName: string;
+  fileType: string;
+  uploadedAt: Date;
+  uploadedBy: string;
+}

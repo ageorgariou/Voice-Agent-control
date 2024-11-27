@@ -3,18 +3,26 @@ import { CallData } from '../types';
 const BASE_URL = 'https://api.vapi.ai';
 
 const getApiKey = () => {
-  const apiKey = localStorage.getItem('vapiKey');
+  // Get current user
+  const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+  const apiKey = localStorage.getItem(`vapiKey_${currentUser.username}`);
+  
   if (!apiKey) {
     throw new Error('No API key found. Please set your API key in Settings.');
   }
   return apiKey;
 };
 
-export const fetchCalls = async (dateRange: { from: string; to: string }, page: number, pageSize: number) => {
+export const fetchCalls = async (
+  dateRange: { from: string; to: string }, 
+  page: number, 
+  pageSize: number
+) => {
   try {
     const response = await fetch(`${BASE_URL}/call`, {
       headers: {
-        'Authorization': `Bearer ${getApiKey()}`
+        'Authorization': `Bearer ${getApiKey()}`,
+        'Content-Type': 'application/json'
       }
     });
 

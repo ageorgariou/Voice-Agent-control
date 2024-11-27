@@ -75,7 +75,7 @@ export default function ROICalculator() {
         <div className="bg-white rounded-xl shadow-lg p-8">
           <div className="flex items-center justify-center mb-8">
             <h1 className="text-2xl font-bold text-gray-900">
-              Missed Call ROI Calculator
+              ROI Calculator
             </h1>
           </div>
 

@@ -111,13 +111,13 @@ export default function Login({ onLogin }: LoginProps) {
         return;
       }
 
-      // Create new user
+      // Create new user with 2FA disabled by default, no API key, and empty airtable base name
       const newUser: User = {
         username,
         password,
         name: username,
         email,
-        airtableBaseName: 'Sabos Account',
+        airtableBaseName: '', // Initialize as empty string
         createdAt: new Date().toISOString()
       };
 
@@ -125,57 +125,107 @@ export default function Login({ onLogin }: LoginProps) {
       const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
       localStorage.setItem('users', JSON.stringify([...existingUsers, newUser]));
       localStorage.setItem('currentUser', JSON.stringify(newUser));
+      
+      // Initialize user settings
+      localStorage.setItem(`2FA_${username}`, 'false');
+      localStorage.setItem(`vapiKey_${username}`, ''); // Initialize empty API key
+      
+      // Remove any existing API key to prevent inheritance
+      localStorage.removeItem('vapiKey');
+      
       onLogin(username);
     } else {
-      // Special case for admin login
+      // Special case for admin login - check this BEFORE other logic
       if (username === 'admin' && password === '12345') {
         localStorage.setItem('userName', username);
         localStorage.setItem('userPassword', password);
+        localStorage.setItem('currentUser', JSON.stringify({
+          username: 'admin',
+          password: '12345',
+          name: 'Administrator',
+          email: 'admin@example.com',
+          airtableBaseName: 'Sabos Account',
+          createdAt: new Date().toISOString()
+        }));
+        
+        // Initialize admin's API key as empty if it doesn't exist
+        if (!localStorage.getItem('vapiKey_admin')) {
+          localStorage.setItem('vapiKey_admin', '');
+        }
+        
         onLogin(username);
         return;
       }
 
       if (is2FAStep) {
-        // Verify 2FA code
+        // Handle 2FA verification
         if (verificationCode === generatedCode) {
-          onLogin(username);
+          // Get the user data from the users array
+          const users = JSON.parse(localStorage.getItem('users') || '[]');
+          const currentUser = users.find((u: User) => u.username === username);
+          
+          if (currentUser) {
+            // Save all user data to localStorage
+            localStorage.setItem('userName', currentUser.name);
+            localStorage.setItem('userEmail', currentUser.email);
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            // Get the avatar if it exists
+            const userAvatar = localStorage.getItem(`avatar_${currentUser.username}`);
+            if (userAvatar) {
+              localStorage.setItem('userAvatar', userAvatar);
+            }
+            
+            onLogin(username);
+          } else {
+            setError('User data not found');
+          }
         } else {
           setError('Invalid verification code');
         }
         return;
       }
 
-      // Get users from localStorage
-      const users: User[] = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = users.find(u => u.username === username && u.password === password);
+      // Regular user login logic
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const user = users.find((u: User) => u.username === username && u.password === password);
 
       if (user) {
-        // Check if user has 2FA enabled
-        const is2FAEnabled = localStorage.getItem('2FAEnabled') === 'true';
+        // Check if 2FA is enabled for this specific user
+        const is2FAEnabled = localStorage.getItem(`2FA_${user.username}`) === 'true';
         
-        if (!is2FAEnabled) {
-          // If 2FA is disabled, log in directly
-          localStorage.setItem('currentUser', JSON.stringify(user));
-          onLogin(username);
-          return;
-        }
-
-        // If 2FA is enabled, continue with verification process
-        const code = generateVerificationCode();
-        setGeneratedCode(code);
-        
-        const emailSent = await sendVerificationEmail(user.email, code);
-
-        if (emailSent) {
-          setIs2FAStep(true);
-          setError('Verification code sent to ' + user.email);
-          setTimeout(() => setError(''), 5000);
+        if (is2FAEnabled) {
+          // Store user data temporarily
+          localStorage.setItem('tempUserData', JSON.stringify(user));
+          
+          // Generate and send 2FA code
+          const code = generateVerificationCode();
+          setGeneratedCode(code);
+          const emailSent = await sendVerificationEmail(user.email, code);
+          
+          if (emailSent) {
+            setIs2FAStep(true);
+            setError('Verification code sent to ' + user.email);
+            setTimeout(() => setError(''), 5000);
+          }
         } else {
-          setError('Failed to send verification code. Please try again.');
+          localStorage.setItem('userName', user.name);
+          localStorage.setItem('userPassword', user.password);
+          localStorage.setItem('userEmail', user.email);
+          localStorage.setItem('currentUser', JSON.stringify(user));
+          
+          // Remove any existing API key to prevent inheritance
+          localStorage.removeItem('vapiKey');
+          
+          // Initialize API key if it doesn't exist
+          if (!localStorage.getItem(`vapiKey_${user.username}`)) {
+            localStorage.setItem(`vapiKey_${user.username}`, '');
+          }
+          
+          onLogin(username);
         }
       } else {
         setError('Invalid username or password');
-        setTimeout(() => setError(''), 3000);
       }
     }
   };
@@ -205,6 +255,13 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <img 
+            src="/mrceeschatbot.png" 
+            alt="mrceeschatbot Logo" 
+            className="h-16 w-16 rounded-full bg-indigo-600 p-2"
+          />
+        </div>
         <h2 className="mt-6 text-center text-4xl font-extrabold text-gray-900">
           {isSignUp ? 'Create an account' : is2FAStep ? 'Enter Verification Code' : 'Sign in to your account'}
         </h2>
@@ -329,9 +386,6 @@ export default function Login({ onLogin }: LoginProps) {
                     onChange={(e) => setVerificationCode(e.target.value)}
                   />
                 </div>
-                <p className="mt-2 text-sm text-gray-500">
-                  Please check your email for the verification code.
-                </p>
                 <button
                   type="button"
                   onClick={handleResendCode}
