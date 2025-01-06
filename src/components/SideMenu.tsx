@@ -8,8 +8,9 @@ interface SideMenuProps {
 }
 
 export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
-  const isAdmin = localStorage.getItem('userName') === 'admin' && 
-                 localStorage.getItem('userPassword') === '12345';
+  const isAdmin = localStorage.getItem('currentUser') ? 
+    JSON.parse(localStorage.getItem('currentUser') || '{}').username === 'admin' 
+    : false;
 
   return (
     <div

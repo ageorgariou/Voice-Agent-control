@@ -69,8 +69,8 @@ export default function ContactManager() {
     
     try {
       const base = new Airtable({
-        apiKey: import.meta.env.VITE_AIRTABLE_API_KEY
-      }).base(import.meta.env.VITE_AIRTABLE_BASE_ID);
+        apiKey: 'patKuOvmhLYa235Hb.c216498e7a2dd83e6c77f2aac7fd148ffd9d38268ecf15b33e6088a29ee99238'
+      }).base('app5Y8j2mOMVc8bgE');
 
       const baseName = localStorage.getItem('airtableBaseName') || 'Sabos Account';
 

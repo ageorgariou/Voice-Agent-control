@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Lock, Mail, Shield } from 'lucide-react';
 import emailjs from '@emailjs/browser';
+import { userService } from '../services/userService';
 
 interface LoginProps {
   onLogin: (username: string) => void;
@@ -105,128 +106,76 @@ export default function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setError('');
 
-    if (isSignUp) {
-      // Validate sign up form
-      if (!validateSignUp()) {
-        return;
-      }
-
-      // Create new user with 2FA disabled by default, no API key, and empty airtable base name
-      const newUser: User = {
-        username,
-        password,
-        name: username,
-        email,
-        airtableBaseName: '', // Initialize as empty string
-        createdAt: new Date().toISOString()
-      };
-
-      // Get existing users and save new user
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      localStorage.setItem('users', JSON.stringify([...existingUsers, newUser]));
-      localStorage.setItem('currentUser', JSON.stringify(newUser));
-      
-      // Initialize user settings
-      localStorage.setItem(`2FA_${username}`, 'false');
-      localStorage.setItem(`vapiKey_${username}`, ''); // Initialize empty API key
-      
-      // Remove any existing API key to prevent inheritance
-      localStorage.removeItem('vapiKey');
-      
-      onLogin(username);
-    } else {
+    try {
       // Special case for admin login - check this BEFORE other logic
       if (username === 'admin' && password === '12345') {
-        localStorage.setItem('userName', username);
-        localStorage.setItem('userPassword', password);
-        localStorage.setItem('currentUser', JSON.stringify({
+        const adminUser = {
           username: 'admin',
           password: '12345',
           name: 'Administrator',
           email: 'admin@example.com',
-          airtableBaseName: 'Sabos Account',
-          createdAt: new Date().toISOString()
-        }));
+          airtable_base_name: 'Sabos Account',
+          created_at: new Date().toISOString()
+        };
+
+        // Store admin user data
+        localStorage.setItem('currentUser', JSON.stringify(adminUser));
+        localStorage.setItem('userName', 'admin');
+        localStorage.setItem('userPassword', '12345');
         
-        // Initialize admin's API key as empty if it doesn't exist
-        if (!localStorage.getItem('vapiKey_admin')) {
-          localStorage.setItem('vapiKey_admin', '');
-        }
-        
+        onLogin('admin');
+        return;
+      }
+
+      if (isSignUp) {
+        if (!validateSignUp()) return;
+
+        // Create new user
+        const newUser = {
+          username,
+          password, // Note: In production, hash the password
+          name: username,
+          email,
+          airtable_base_name: '',
+          created_at: new Date().toISOString()
+        };
+
+        await userService.createUser(newUser);
+        await userService.setUserApiKey(username, '');
+        await userService.set2FAStatus(username, false);
+
         onLogin(username);
-        return;
-      }
-
-      if (is2FAStep) {
-        // Handle 2FA verification
-        if (verificationCode === generatedCode) {
-          // Get the user data from the users array
-          const users = JSON.parse(localStorage.getItem('users') || '[]');
-          const currentUser = users.find((u: User) => u.username === username);
-          
-          if (currentUser) {
-            // Save all user data to localStorage
-            localStorage.setItem('userName', currentUser.name);
-            localStorage.setItem('userEmail', currentUser.email);
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            
-            // Get the avatar if it exists
-            const userAvatar = localStorage.getItem(`avatar_${currentUser.username}`);
-            if (userAvatar) {
-              localStorage.setItem('userAvatar', userAvatar);
-            }
-            
-            onLogin(username);
-          } else {
-            setError('User data not found');
-          }
-        } else {
-          setError('Invalid verification code');
-        }
-        return;
-      }
-
-      // Regular user login logic
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = users.find((u: User) => u.username === username && u.password === password);
-
-      if (user) {
-        // Check if 2FA is enabled for this specific user
-        const is2FAEnabled = localStorage.getItem(`2FA_${user.username}`) === 'true';
-        
-        if (is2FAEnabled) {
-          // Store user data temporarily
-          localStorage.setItem('tempUserData', JSON.stringify(user));
-          
-          // Generate and send 2FA code
-          const code = generateVerificationCode();
-          setGeneratedCode(code);
-          const emailSent = await sendVerificationEmail(user.email, code);
-          
-          if (emailSent) {
-            setIs2FAStep(true);
-            setError('Verification code sent to ' + user.email);
-            setTimeout(() => setError(''), 5000);
-          }
-        } else {
-          localStorage.setItem('userName', user.name);
-          localStorage.setItem('userPassword', user.password);
-          localStorage.setItem('userEmail', user.email);
-          localStorage.setItem('currentUser', JSON.stringify(user));
-          
-          // Remove any existing API key to prevent inheritance
-          localStorage.removeItem('vapiKey');
-          
-          // Initialize API key if it doesn't exist
-          if (!localStorage.getItem(`vapiKey_${user.username}`)) {
-            localStorage.setItem(`vapiKey_${user.username}`, '');
-          }
-          
-          onLogin(username);
-        }
       } else {
-        setError('Invalid username or password');
+        // Regular user login logic
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const user = users.find((u: User) => u.username === username && u.password === password);
+
+        if (user) {
+          const is2FAEnabled = localStorage.getItem(`2FA_${user.username}`) === 'true';
+          
+          if (is2FAEnabled) {
+            // Handle 2FA
+            const code = generateVerificationCode();
+            setGeneratedCode(code);
+            const emailSent = await sendVerificationEmail(user.email, code);
+            
+            if (emailSent) {
+              setIs2FAStep(true);
+              setError('Verification code sent to ' + user.email);
+              setTimeout(() => setError(''), 5000);
+            }
+          } else {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+            localStorage.setItem('userName', user.name);
+            localStorage.setItem('userPassword', user.password);
+            onLogin(username);
+          }
+        } else {
+          setError('Invalid username or password');
+        }
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 

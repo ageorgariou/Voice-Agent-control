@@ -14,9 +14,11 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const userName = localStorage.getItem('userName');
-    const userPassword = localStorage.getItem('userPassword');
-    setIsAdmin(userName === 'admin' && userPassword === '12345');
+    const currentUser = localStorage.getItem('currentUser');
+    if (currentUser) {
+      const user = JSON.parse(currentUser);
+      setIsAdmin(user.username === 'admin');
+    }
   }, [isLoggedIn]);
 
   const handleLogin = (username: string) => {

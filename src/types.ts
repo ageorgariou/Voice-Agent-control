@@ -33,3 +33,13 @@ export interface SavedContract {
   uploadedAt: Date;
   uploadedBy: string;
 }
+
+export interface User {
+  id: string;
+  username: string;
+  password: string;
+  name: string;
+  email: string;
+  airtable_base_name: string;
+  created_at: string;
+}

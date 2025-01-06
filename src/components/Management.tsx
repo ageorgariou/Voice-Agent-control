@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Trash2, Plus, X, Search, Clock, LogOut, Menu, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import SideMenu from './SideMenu';
+import { userService } from '../services/userService';
 
 interface User {
   username: string;
@@ -212,6 +213,10 @@ export default function Management() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
+  const isAdmin = localStorage.getItem('currentUser') ? 
+    JSON.parse(localStorage.getItem('currentUser') || '{}').username === 'admin' 
+    : false;
+
   useEffect(() => {
     // Load users from localStorage
     let storedUsers = localStorage.getItem('users');
@@ -236,37 +241,81 @@ export default function Management() {
     setUsers(newUsers);
   };
 
-  const handleCreateUser = (newUser: User) => {
-    // Get existing users
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    
-    // Create new user with 2FA disabled and no API key
-    const userToAdd = {
-      ...newUser,
-      createdAt: new Date().toISOString()
-    };
-    
-    // Save the new user
-    localStorage.setItem('users', JSON.stringify([...existingUsers, userToAdd]));
-    
-    // Set user-specific settings
-    localStorage.setItem(`2FA_${newUser.username}`, 'false');
-    localStorage.setItem(`vapiKey_${newUser.username}`, ''); // Initialize empty API key for this user
-    
-    setIsModalOpen(false);
+  const handleCreateUser = async (newUser: User) => {
+    try {
+      // Create user in Supabase first
+      const createdUser = await userService.createUser({
+        username: newUser.username,
+        password: newUser.password,
+        name: newUser.name,
+        email: newUser.email,
+        airtable_base_name: '',
+        created_at: new Date().toISOString()
+      });
+
+      if (createdUser) {
+        // Get existing users from localStorage
+        const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        
+        // Create new user with 2FA disabled and no API key
+        const userToAdd = {
+          ...newUser,
+          createdAt: new Date().toISOString()
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('users', JSON.stringify([...existingUsers, userToAdd]));
+        
+        // Set user-specific settings
+        localStorage.setItem(`2FA_${newUser.username}`, 'false');
+        localStorage.setItem(`vapiKey_${newUser.username}`, '');
+
+        // Initialize user settings in Supabase
+        await userService.setUserApiKey(newUser.username, '');
+        await userService.set2FAStatus(newUser.username, false);
+        
+        setIsModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      // Optionally show error to user
+    }
   };
 
-  const handleUpdateUser = (updatedUser: User) => {
-    const newUsers = users.map(u => 
-      u.username === updatedUser.username ? updatedUser : u
-    );
-    saveUsers(newUsers);
-    setIsModalOpen(false);
+  const handleUpdateUser = async (updatedUser: User) => {
+    try {
+      // Update user in Supabase
+      await userService.updateUser(updatedUser.username, updatedUser);
+
+      // Update localStorage
+      const newUsers = users.map(u => 
+        u.username === updatedUser.username ? updatedUser : u
+      );
+      saveUsers(newUsers);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      // Optionally show error to user
+    }
   };
 
-  const handleDeleteUser = (username: string) => {
+  const handleDeleteUser = async (username: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      saveUsers(users.filter(u => u.username !== username));
+      try {
+        // Delete from Supabase (this will cascade to user_settings due to foreign key)
+        const { error } = await supabase
+          .from('users')
+          .delete()
+          .eq('username', username);
+
+        if (error) throw error;
+
+        // Update localStorage
+        saveUsers(users.filter(u => u.username !== username));
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        // Optionally show error to user
+      }
     }
   };
 
