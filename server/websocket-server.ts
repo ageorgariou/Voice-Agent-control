@@ -23,7 +23,6 @@ wss.on('connection', (ws) => {
 // Webhook endpoint
 app.post('/webhook', (req, res) => {
   const webhookData = req.body;
-  console.log('Received webhook data:', webhookData);
 
   // Broadcast the data to all connected WebSocket clients
   clients.forEach(client => {

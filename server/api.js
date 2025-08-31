@@ -1,7 +1,27 @@
 import express from 'express';
 import cors from 'cors';
 import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
+import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { 
+  validateBody, 
+  validateParams, 
+  validationSchemas, 
+  paramSchemas,
+  rateLimit,
+  sanitizeInput,
+  securityHeaders
+} from './validation.js';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  authenticateToken,
+  requireAdmin,
+  requireOwnershipOrAdmin,
+  refreshAccessToken,
+  revokeRefreshToken,
+  revokeAllUserTokens
+} from './auth.js';
 
 dotenv.config();
 
@@ -10,7 +30,10 @@ const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(securityHeaders);
+app.use(sanitizeInput);
+app.use(rateLimit);
 
 // MongoDB connection
 const uri = process.env.MONGODB_URI;
@@ -37,13 +60,30 @@ async function connectToMongoDB() {
 }
 
 // User API routes
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', validateBody(validationSchemas.createUser), async (req, res) => {
   try {
     const userData = req.body;
     const usersCollection = db.collection('users');
     
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ username: userData.username });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    
+    // Check if email already exists
+    const existingEmail = await usersCollection.findOne({ email: userData.email });
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    
+    // Hash the password before storing
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+    
     const newUser = {
       ...userData,
+      password: hashedPassword, // Store hashed password
       created_at: new Date(),
       updated_at: new Date(),
       is_active: true,
@@ -58,14 +98,17 @@ app.post('/api/users', async (req, res) => {
     const result = await usersCollection.insertOne(newUser);
     const createdUser = await usersCollection.findOne({ _id: result.insertedId });
     
-    res.status(201).json(createdUser);
+    // Remove password from response
+    const { password, ...userResponse } = createdUser;
+    
+    res.status(201).json(userResponse);
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Failed to create user' });
   }
 });
 
-app.get('/api/users/:username', async (req, res) => {
+app.get('/api/users/:username', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), async (req, res) => {
   try {
     const { username } = req.params;
     const usersCollection = db.collection('users');
@@ -76,14 +119,17 @@ app.get('/api/users/:username', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json(user);
+    // Remove password from response
+    const { password, ...userResponse } = user;
+    
+    res.json(userResponse);
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 
-app.put('/api/users/:username', async (req, res) => {
+app.put('/api/users/:username', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), validateBody(validationSchemas.updateUser), async (req, res) => {
   try {
     const { username } = req.params;
     const updates = req.body;
@@ -107,7 +153,7 @@ app.put('/api/users/:username', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:username', async (req, res) => {
+app.delete('/api/users/:username', authenticateToken, requireAdmin, validateParams(paramSchemas.username), async (req, res) => {
   try {
     const { username } = req.params;
     const usersCollection = db.collection('users');
@@ -129,7 +175,7 @@ app.delete('/api/users/:username', async (req, res) => {
   }
 });
 
-app.put('/api/users/:username/api-key', async (req, res) => {
+app.put('/api/users/:username/api-key', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), validateBody(validationSchemas.updateApiKey), async (req, res) => {
   try {
     const { username } = req.params;
     const { keyType, apiKey } = req.body;
@@ -152,7 +198,7 @@ app.put('/api/users/:username/api-key', async (req, res) => {
   }
 });
 
-app.get('/api/users/:username/api-key/:keyType', async (req, res) => {
+app.get('/api/users/:username/api-key/:keyType', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.usernameAndKeyType), async (req, res) => {
   try {
     const { username, keyType } = req.params;
     const usersCollection = db.collection('users');
@@ -173,7 +219,7 @@ app.get('/api/users/:username/api-key/:keyType', async (req, res) => {
   }
 });
 
-app.put('/api/users/:username/2fa', async (req, res) => {
+app.put('/api/users/:username/2fa', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), validateBody(validationSchemas.update2FA), async (req, res) => {
   try {
     const { username } = req.params;
     const { enabled } = req.body;
@@ -196,7 +242,7 @@ app.put('/api/users/:username/2fa', async (req, res) => {
   }
 });
 
-app.get('/api/users/:username/2fa', async (req, res) => {
+app.get('/api/users/:username/2fa', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), async (req, res) => {
   try {
     const { username } = req.params;
     const usersCollection = db.collection('users');
@@ -217,18 +263,25 @@ app.get('/api/users/:username/2fa', async (req, res) => {
   }
 });
 
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const usersCollection = db.collection('users');
     const users = await usersCollection.find({ is_active: true }).toArray();
-    res.json(users);
+    
+    // Remove passwords from all user responses
+    const usersWithoutPasswords = users.map(user => {
+      const { password, ...userResponse } = user;
+      return userResponse;
+    });
+    
+    res.json(usersWithoutPasswords);
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-app.put('/api/users/:username/last-login', async (req, res) => {
+app.put('/api/users/:username/last-login', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), async (req, res) => {
   try {
     const { username } = req.params;
     const usersCollection = db.collection('users');
@@ -247,6 +300,180 @@ app.put('/api/users/:username/last-login', async (req, res) => {
   } catch (error) {
     console.error('Error updating last login:', error);
     res.status(500).json({ error: 'Failed to update last login' });
+  }
+});
+
+// Authentication endpoints
+app.post('/api/auth/login', validateBody(validationSchemas.login), async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    const usersCollection = db.collection('users');
+    const user = await usersCollection.findOne({ username, is_active: true });
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // Generate tokens
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    
+    // Update last login
+    await usersCollection.updateOne(
+      { username, is_active: true },
+      { 
+        $set: { 
+          last_login: new Date(),
+          updated_at: new Date()
+        }
+      }
+    );
+    
+    // Remove password from response
+    const { password: _, ...userResponse } = user;
+    
+    res.json({ 
+      message: 'Login successful',
+      user: userResponse,
+      accessToken,
+      refreshToken
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Token refresh endpoint
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(401).json({ 
+        error: 'Refresh token required',
+        code: 'REFRESH_TOKEN_MISSING'
+      });
+    }
+    
+    const usersCollection = db.collection('users');
+    const result = await refreshAccessToken(refreshToken, usersCollection);
+    
+    res.json({
+      message: 'Token refreshed successfully',
+      accessToken: result.accessToken,
+      user: result.user
+    });
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    res.status(401).json({ 
+      error: 'Invalid or expired refresh token',
+      code: 'REFRESH_TOKEN_INVALID'
+    });
+  }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (refreshToken) {
+      revokeRefreshToken(refreshToken);
+    }
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Error during logout:', error);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// Logout from all devices endpoint
+app.post('/api/auth/logout-all', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const revokedCount = revokeAllUserTokens(userId);
+    
+    res.json({ 
+      message: 'Logged out from all devices successfully',
+      revokedTokens: revokedCount
+    });
+  } catch (error) {
+    console.error('Error during logout from all devices:', error);
+    res.status(500).json({ error: 'Logout failed' });
+  }
+});
+
+// Get current user profile (protected endpoint)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const usersCollection = db.collection('users');
+    const user = await usersCollection.findOne({ 
+      _id: req.user.userId, 
+      is_active: true 
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Remove password from response
+    const { password, ...userResponse } = user;
+    
+    res.json(userResponse);
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// Change password endpoint
+app.put('/api/auth/change-password', authenticateToken, validateBody(validationSchemas.changePassword), async (req, res) => {
+  try {
+    const { username, currentPassword, newPassword } = req.body;
+    
+    const usersCollection = db.collection('users');
+    const user = await usersCollection.findOne({ username, is_active: true });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const saltRounds = 12;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+    
+    // Update password
+    await usersCollection.updateOne(
+      { username, is_active: true },
+      { 
+        $set: { 
+          password: hashedNewPassword,
+          updated_at: new Date()
+        }
+      }
+    );
+    
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 

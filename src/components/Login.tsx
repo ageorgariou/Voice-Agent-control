@@ -1,209 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { User, Lock, Mail, Shield } from 'lucide-react';
-import emailjs from '@emailjs/browser';
-import { userService } from '../services/userService';
+import React, { useState } from 'react';
+import { User, Lock, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { Navigate, useLocation } from 'react-router-dom';
 
-interface LoginProps {
-  onLogin: (username: string) => void;
-}
-
-interface User {
-  username: string;
-  password: string;
-  name: string;
-  email: string;
-  airtableBaseName: string;
-  createdAt: string;
-}
-
-export default function Login({ onLogin }: LoginProps) {
-  const [isSignUp, setIsSignUp] = useState(false);
+export default function Login() {
+  const { login, isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [email, setEmail] = useState('');
-  const [passcode, setPasscode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [is2FAStep, setIs2FAStep] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize EmailJS
-  useEffect(() => {
-    emailjs.init("UPMrTeNnHFYu9daXu"); // Initialize with your public key
-  }, []);
-
-  const generateVerificationCode = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
-  const sendVerificationEmail = async (userEmail: string, code: string) => {
-    try {
-      console.log('Sending email to:', userEmail, 'with code:', code); // Debug log
-
-      const templateParams = {
-        to_email: userEmail,
-        verification_code: code,
-        // Add these parameters to match your EmailJS template
-        to_name: username,
-        message: `Your verification code is: ${code}`,
-      };
-
-      const response = await emailjs.send(
-        'service_1medfdc',
-        'template_rhy4ndg',
-        templateParams,
-        'UPMrTeNnHFYu9daXu'
-      );
-
-      console.log('Email sent successfully:', response); // Debug log
-      return true;
-    } catch (error) {
-      console.error('Error sending email:', error);
-      setError('Failed to send verification code: ' + (error as Error).message);
-      return false;
-    }
-  };
-
-  const validateSignUp = () => {
-    // Password validation
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return false;
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
-
-    // Passcode validation
-    if (passcode !== '123456') {
-      setError('Invalid passcode');
-      return false;
-    }
-
-    // Get existing users
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-
-    // Check for duplicate username
-    if (existingUsers.some((user: User) => user.username === username)) {
-      setError('Sorry unfortunately this username is already taken.');
-      return false;
-    }
-
-    // Check for duplicate email
-    if (existingUsers.some((user: User) => user.email === email)) {
-      setError('The email address you entered is already associated with an existing account. Please use a different email address or log in to your account.');
-      return false;
-    }
-
-    return true;
-  };
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    const from = location.state?.from?.pathname || '/';
+    return <Navigate to={from} replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
 
     try {
-      // Special case for admin login - check this BEFORE other logic
-      if (username === 'admin' && password === '12345') {
-        const adminUser = {
-          username: 'admin',
-          password: '12345',
-          name: 'Administrator',
-          email: 'admin@example.com',
-          airtable_base_name: 'Sabos Account',
-          created_at: new Date().toISOString()
-        };
-
-        // Store admin user data
-        localStorage.setItem('currentUser', JSON.stringify(adminUser));
-        localStorage.setItem('userName', 'admin');
-        localStorage.setItem('userPassword', '12345');
-        
-        onLogin('admin');
-        return;
-      }
-
-      if (isSignUp) {
-        if (!validateSignUp()) return;
-
-        // Create new user
-        const newUser = {
-          username,
-          password, // Note: In production, hash the password
-          name: username,
-          email,
-          airtable_base_name: '',
-          created_at: new Date().toISOString()
-        };
-
-        await userService.createUser({
-          ...newUser,
-          userType: 'User',
-          is_active: true
-        });
-        await userService.setUserApiKey(username, 'vapi_key', '');
-        await userService.set2FAStatus(username, false);
-
-        onLogin(username);
-      } else {
-        // Regular user login logic
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = users.find((u: User) => u.username === username && u.password === password);
-
-        if (user) {
-          const is2FAEnabled = localStorage.getItem(`2FA_${user.username}`) === 'true';
-          
-          if (is2FAEnabled) {
-            // Handle 2FA
-            const code = generateVerificationCode();
-            setGeneratedCode(code);
-            const emailSent = await sendVerificationEmail(user.email, code);
-            
-            if (emailSent) {
-              setIs2FAStep(true);
-              setError('Verification code sent to ' + user.email);
-              setTimeout(() => setError(''), 5000);
-            }
-          } else {
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            localStorage.setItem('userName', user.name);
-            localStorage.setItem('userPassword', user.password);
-            onLogin(username);
-          }
-        } else {
-          setError('Invalid username or password');
-        }
-      }
+      await login(username, password);
+      // Navigation will be handled by the redirect above
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleResendCode = async () => {
-    const code = generateVerificationCode();
-    setGeneratedCode(code);
-    
-    let emailToUse;
-    if (username === 'admin') {
-      emailToUse = 'admin@example.com';
-    } else {
-      emailToUse = localStorage.getItem('userEmail');
-      if (!emailToUse) {
-        setError('No email found for this account');
-        return;
-      }
-    }
-
-    const emailSent = await sendVerificationEmail(emailToUse, code);
-    if (emailSent) {
-      setError('New verification code sent to ' + emailToUse);
-      setTimeout(() => setError(''), 3000);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -211,171 +47,91 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="flex justify-center">
           <img 
             src="/mrceeschatbot.png" 
-            alt="mrceeschatbot Logo" 
+            alt="Voice Agent Control Logo" 
             className="h-16 w-16 rounded-full bg-indigo-600 p-2"
           />
         </div>
-        <h2 className="mt-6 text-center text-4xl font-extrabold text-gray-900">
-          {isSignUp ? 'Create an account' : is2FAStep ? 'Enter Verification Code' : 'Sign in to your account'}
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Sign in to your account
         </h2>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg relative">
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
               {error}
             </div>
           )}
           
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {!is2FAStep ? (
-              <>
-                <div>
-                  <label htmlFor="username" className="block text-base font-medium text-gray-700">
-                    Username
-                  </label>
-                  <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <input
-                      id="username"
-                      name="username"
-                      type="text"
-                      required
-                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 text-base border-gray-300 rounded-lg h-12"
-                      placeholder="Enter username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                  </div>
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                Username
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
                 </div>
-
-                {isSignUp && (
-                  <div>
-                    <label htmlFor="email" className="block text-base font-medium text-gray-700">
-                      Email
-                    </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail className="h-6 w-6 text-gray-400" />
-                      </div>
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        required
-                        className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 text-base border-gray-300 rounded-lg h-12"
-                        placeholder="Enter email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label htmlFor="password" className="block text-base font-medium text-gray-700">
-                    Password
-                  </label>
-                  <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-6 w-6 text-gray-400" />
-                    </div>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      required
-                      className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 text-base border-gray-300 rounded-lg h-12"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {isSignUp && (
-                  <div>
-                    <label htmlFor="passcode" className="block text-base font-medium text-gray-700">
-                      Passcode
-                    </label>
-                    <div className="mt-1 relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Lock className="h-6 w-6 text-gray-400" />
-                      </div>
-                      <input
-                        id="passcode"
-                        name="passcode"
-                        type="password"
-                        required
-                        className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 text-base border-gray-300 rounded-lg h-12"
-                        placeholder="Enter passcode"
-                        value={passcode}
-                        onChange={(e) => setPasscode(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div>
-                <label htmlFor="verificationCode" className="block text-base font-medium text-gray-700">
-                  Verification Code
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Shield className="h-6 w-6 text-gray-400" />
-                  </div>
-                  <input
-                    id="verificationCode"
-                    name="verificationCode"
-                    type="text"
-                    required
-                    className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-12 text-base border-gray-300 rounded-lg h-12"
-                    placeholder="Enter verification code"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleResendCode}
-                  className="mt-2 text-sm text-indigo-600 hover:text-indigo-500"
-                >
-                  Resend verification code
-                </button>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  required
+                  disabled={isSubmitting}
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md h-10"
+                  placeholder="Enter username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
               </div>
-            )}
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  disabled={isSubmitting}
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-10 sm:text-sm border-gray-300 rounded-md h-10"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
 
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSignUp ? 'Sign up' : is2FAStep ? 'Verify' : 'Sign in'}
+                {isSubmitting ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
           </form>
-
-          {!is2FAStep && (
-            <div className="mt-6">
-              <button
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError('');
-                  setUsername('');
-                  setPassword('');
-                  setEmail('');
-                  setPasscode('');
-                }}
-                className="w-full text-center text-sm text-indigo-600 hover:text-indigo-500"
-              >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

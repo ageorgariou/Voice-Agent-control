@@ -1,6 +1,6 @@
 import { CallData } from '../types';
 
-const BASE_URL = 'https://api.vapi.ai';
+const BASE_URL = import.meta.env.VITE_VAPI_BASE_URL || process.env.VAPI_BASE_URL || 'https://api.vapi.ai';
 
 const getApiKey = () => {
   // Get current user
@@ -29,9 +29,6 @@ export const fetchCalls = async (
       createdAtLe: dateRange.to
     });
 
-    console.log('VAPI API Request:', `${BASE_URL}/call?${params}`);
-    console.log('Date Range:', dateRange);
-    console.log('Page Size:', pageSize);
 
     const response = await fetch(`${BASE_URL}/call?${params}`, {
       headers: {
@@ -45,8 +42,6 @@ export const fetchCalls = async (
     }
 
     const data = await response.json();
-    console.log('Raw VAPI Response:', data);
-    console.log('Total calls received from API:', data.length);
 
     // Filter calls by type (date filtering now handled by API query params)
     const processedCalls = data
@@ -67,13 +62,11 @@ export const fetchCalls = async (
 
         // First try artifact.transcript (this is the main transcript location per VAPI docs)
         if (call.artifact?.transcript && Array.isArray(call.artifact.transcript)) {
-          console.log('Processing artifact transcript for call:', call.id, call.artifact.transcript);
           transcript = call.artifact.transcript
             .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant' || msg.role === 'bot')
             .map((msg: any) => {
               const content = msg.message || msg.content || msg.text || '';
               const role = msg.role === 'bot' ? 'assistant' : msg.role;
-              console.log('Transcript message:', role, content);
               return content ? `${role}: ${content}` : '';
             })
             .filter((line: string) => line.trim() !== '')
@@ -81,13 +74,11 @@ export const fetchCalls = async (
         }
         // Fallback to messages array if artifact.transcript not available
         else if (call.messages && call.messages.length > 0) {
-          console.log('Processing messages for call:', call.id, call.messages);
           transcript = call.messages
             .filter((msg: any) => msg.role === 'user' || msg.role === 'assistant' || msg.role === 'bot')
             .map((msg: any) => {
               const content = msg.content || msg.message || msg.text || '';
               const role = msg.role === 'bot' ? 'assistant' : (msg.role || 'unknown');
-              console.log('Message:', role, content);
               return content ? `${role}: ${content}` : '';
             })
             .filter((line: string) => line.trim() !== '')
@@ -98,18 +89,13 @@ export const fetchCalls = async (
         if (!transcript || transcript === 'No transcript available' || transcript.trim() === '') {
           if (typeof call.artifact?.transcript === 'string') {
             transcript = call.artifact.transcript;
-            console.log('Using artifact transcript string:', transcript);
           } else if (call.analysis?.transcript) {
             transcript = call.analysis.transcript;
-            console.log('Using analysis transcript:', transcript);
           } else if (call.transcript) {
             transcript = call.transcript;
-            console.log('Using direct transcript:', transcript);
           }
         }
 
-        console.log('Final transcript for call', call.id, ':', transcript);
-        console.log('Full call object for debugging:', JSON.stringify(call, null, 2));
 
         // Map status correctly
         let status = 'unknown';
@@ -147,8 +133,6 @@ export const fetchCalls = async (
         };
       }) as CallData[];
 
-    console.log('Processed calls count:', processedCalls.length);
-    console.log('Final calls being returned:', processedCalls);
 
     return processedCalls;
   } catch (error) {

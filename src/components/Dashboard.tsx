@@ -10,12 +10,10 @@ import { fetchCalls } from '../services/vapiServices';
 import FilterMenu from './FilterMenu';
 import SideMenu from './SideMenu';
 import ApiKeyPrompt from './ApiKeyPrompt';
+import { useAuth } from '../contexts/AuthContext';
 
-interface DashboardProps {
-  onLogout: () => void;
-}
-
-export default function Dashboard({ onLogout }: DashboardProps) {
+export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('daily');
   const [searchQuery, setSearchQuery] = useState('');
   const [calls, setCalls] = useState<CallData[]>([]);
@@ -65,7 +63,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           300,
           userApiKey
         );
-        console.log('Dashboard: Received calls from fetchCalls:', fetchedCalls.length);
         setCalls(fetchedCalls);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch calls');
@@ -127,7 +124,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
             </div>
             <div className="flex items-center space-x-4">
               <button
-                onClick={onLogout}
+                onClick={logout}
                 className="p-2 text-gray-700 hover:text-gray-900 rounded-full hover:bg-gray-100"
               >
                 <LogOut className="h-5 w-5" />
