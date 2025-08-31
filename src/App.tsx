@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
-import ROICalculator from './components/ROICalculator';
-import AutomatedSMS from './components/AutomatedSMS';
-import ContractForms from './components/ContractForms';
 import ContactManager from './components/ContactManager';
 import Management from './components/Management';
 import PasswordProtectedRoute from './components/PasswordProtectedRoute';
@@ -15,14 +12,22 @@ function App() {
 
   useEffect(() => {
     const currentUser = localStorage.getItem('currentUser');
-    if (currentUser) {
-      const user = JSON.parse(currentUser);
-      setIsAdmin(user.username === 'admin');
+    const userName = localStorage.getItem('userName');
+    
+    if (currentUser || userName) {
+      setIsLoggedIn(true);
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        setIsAdmin(user.username === 'admin');
+      } else if (userName === 'admin') {
+        setIsAdmin(true);
+      }
     }
-  }, [isLoggedIn]);
+  }, []);
 
   const handleLogin = (username: string) => {
     setIsLoggedIn(true);
+    setIsAdmin(username === 'admin');
   };
 
   const handleLogout = () => {
@@ -40,9 +45,6 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Dashboard onLogout={handleLogout} />} />
-        <Route path="/roi-calculator" element={<ROICalculator />} />
-        <Route path="/automated-sms" element={<AutomatedSMS />} />
-        <Route path="/contract-forms" element={<ContractForms />} />
         <Route path="/contact-manager" element={<ContactManager />} />
         <Route 
           path="/management" 

@@ -7,14 +7,20 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node server/api.js",
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\""
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
-    "@supabase/supabase-js": "^2.47.10",
     "@types/papaparse": "^5.3.15",
     "airtable": "^0.12.2",
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
     "lucide-react": "^0.344.0",
+    "mongodb": "^6.19.0",
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

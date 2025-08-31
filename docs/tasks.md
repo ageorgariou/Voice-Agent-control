@@ -1,0 +1,6 @@
+-Connet to MongoDB Atlas [:checked]
+-Delete SMS sending and connect to salesforce
+-Remove twillio functionality
+-Add user creation and data saving to mongodb
+-Create users and save their data
+-Vercel [:checked]

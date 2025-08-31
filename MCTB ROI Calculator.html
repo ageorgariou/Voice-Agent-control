@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Advanced ROI Calculator</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
@@ -18,14 +19,18 @@
       text-align: center;
       border-radius: 8px;
       background-color: #fff;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
     }
 
-    h1, h2, label, button {
+    h1,
+    h2,
+    label,
+    button {
       color: #0056b3;
     }
 
-    input, button {
+    input,
+    button {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -56,7 +61,8 @@
     }
 
     #roi-calculator-container p {
-      margin-top: 20px; /* Increased vertical spacing */
+      margin-top: 20px;
+      /* Increased vertical spacing */
       color: #0056b3;
     }
 
@@ -68,6 +74,7 @@
     }
   </style>
 </head>
+
 <body>
   <div id="roi-calculator-container">
     <h1>Missed Call Text Back</h1>
@@ -95,7 +102,7 @@
       var averageClientValue = parseFloat(document.getElementById("averageClientValue").value);
       var missedCallsPerMonth = parseFloat(document.getElementById("missedCallsPerMonth").value);
       var averageCloseRate = parseFloat(document.getElementById("averageCloseRate").value);
-      var agencyFee = 99; // Updated Agency Fee: $99/month
+      var agencyFee = 5; // Updated Agency Fee: $99/month
 
       var monthlyRevenue = missedCallsPerMonth * averageClientValue * (averageCloseRate / 100);
       var monthlyLeftOnTable = monthlyRevenue - agencyFee;
@@ -107,4 +114,5 @@
     }
   </script>
 </body>
+
 </html>

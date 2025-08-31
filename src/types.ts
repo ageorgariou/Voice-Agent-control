@@ -35,11 +35,27 @@ export interface SavedContract {
 }
 
 export interface User {
-  id: string;
+  _id?: string;
+  id?: string;
   username: string;
   password: string;
   name: string;
   email: string;
-  airtable_base_name: string;
-  created_at: string;
+  userType: 'Admin' | 'User';
+  airtable_base_name?: string;
+  apiKeys?: {
+    vapi_key?: string;
+    openai_key?: string;
+    elevenlabs_key?: string;
+    [key: string]: string | undefined;
+  };
+  settings?: {
+    two_fa_enabled: boolean;
+    notifications_enabled: boolean;
+    [key: string]: any;
+  };
+  created_at: Date;
+  updated_at: Date;
+  last_login?: Date;
+  is_active: boolean;
 }

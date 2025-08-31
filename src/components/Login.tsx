@@ -140,8 +140,12 @@ export default function Login({ onLogin }: LoginProps) {
           created_at: new Date().toISOString()
         };
 
-        await userService.createUser(newUser);
-        await userService.setUserApiKey(username, '');
+        await userService.createUser({
+          ...newUser,
+          userType: 'User',
+          is_active: true
+        });
+        await userService.setUserApiKey(username, 'vapi_key', '');
         await userService.set2FAStatus(username, false);
 
         onLogin(username);

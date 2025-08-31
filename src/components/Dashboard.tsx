@@ -31,10 +31,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         const userApiKey = localStorage.getItem(`vapiKey_${currentUser.username}`);
-        
+
         if (!userApiKey) {
           setError('API key not found');
           setIsLoading(false);
@@ -43,7 +43,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
         const now = new Date();
         let from = new Date();
-        
+
         switch (timeFrame) {
           case 'daily':
             from.setHours(0, 0, 0, 0);
@@ -62,9 +62,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         const fetchedCalls = await fetchCalls(
           { from: from.toISOString(), to: now.toISOString() },
           1,
-          100,
+          300,
           userApiKey
         );
+        console.log('Dashboard: Received calls from fetchCalls:', fetchedCalls.length);
         setCalls(fetchedCalls);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch calls');
@@ -79,7 +80,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   useEffect(() => {
     // Get current user
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    
+
     // Check for user-specific API key
     const userApiKey = localStorage.getItem(`vapiKey_${currentUser.username}`);
     if (!userApiKey) {
@@ -95,13 +96,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
 
   const getFilteredCalls = () => {
     let filtered = calls;
-    
+
     if (selectedFilters.length > 0) {
       filtered = filtered.filter(call => selectedFilters.includes(call.outcome));
     }
 
     if (searchQuery) {
-      filtered = filtered.filter(call => 
+      filtered = filtered.filter(call =>
         call.transcript.toLowerCase().includes(searchQuery.toLowerCase()) ||
         call.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         call.agentName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -125,7 +126,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </button>
             </div>
             <div className="flex items-center space-x-4">
-              <button 
+              <button
                 onClick={onLogout}
                 className="p-2 text-gray-700 hover:text-gray-900 rounded-full hover:bg-gray-100"
               >
@@ -137,7 +138,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         </div>
       </nav>
 
-      <SideMenu 
+      <SideMenu
         isOpen={isSideMenuOpen}
         onClose={() => setIsSideMenuOpen(false)}
       />
@@ -156,17 +157,16 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               <button
                 key={frame}
                 onClick={() => setTimeFrame(frame)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  timeFrame === frame
+                className={`px-4 py-2 rounded-lg text-sm font-medium ${timeFrame === frame
                     ? 'bg-indigo-600 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 {frame.charAt(0).toUpperCase() + frame.slice(1)}
               </button>
             ))}
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <div className="relative">
               <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -186,13 +186,13 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         </div>
 
         <MetricsGrid timeFrame={timeFrame} calls={calls} />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
           <div className="lg:col-span-2 bg-white rounded-lg shadow h-fit">
             <CallsChart timeFrame={timeFrame} calls={calls} />
           </div>
           <div className="bg-white rounded-lg shadow">
-            <TranscriptList 
+            <TranscriptList
               searchQuery={searchQuery}
               calls={getFilteredCalls()}
               isLoading={isLoading}
@@ -202,7 +202,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
         </div>
       </main>
 
-      <SettingsModal 
+      <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />

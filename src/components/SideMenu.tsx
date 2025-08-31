@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Menu, X, Calculator, MessageSquare, FileText, Users, Settings, Home } from 'lucide-react';
+import { X, Users, Settings, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface SideMenuProps {
@@ -35,30 +34,6 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
           >
             <Home className="h-5 w-5" />
             <span>Home</span>
-          </Link>
-          <Link
-            to="/roi-calculator"
-            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
-            onClick={onClose}
-          >
-            <Calculator className="h-5 w-5" />
-            <span>ROI Calculator</span>
-          </Link>
-          <Link
-            to="/automated-sms"
-            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
-            onClick={onClose}
-          >
-            <MessageSquare className="h-5 w-5" />
-            <span>Automated SMS</span>
-          </Link>
-          <Link
-            to="/contract-forms"
-            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
-            onClick={onClose}
-          >
-            <FileText className="h-5 w-5" />
-            <span>Contract Forms</span>
           </Link>
           <Link
             to="/contact-manager"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, Trash2, Plus, X, Search, Clock, LogOut, Menu, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import SideMenu from './SideMenu';
@@ -213,9 +213,6 @@ export default function Management() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
-  const isAdmin = localStorage.getItem('currentUser') ? 
-    JSON.parse(localStorage.getItem('currentUser') || '{}').username === 'admin' 
-    : false;
 
   useEffect(() => {
     // Load users from localStorage
@@ -243,14 +240,15 @@ export default function Management() {
 
   const handleCreateUser = async (newUser: User) => {
     try {
-      // Create user in Supabase first
+      // Create user in MongoDB
       const createdUser = await userService.createUser({
         username: newUser.username,
         password: newUser.password,
         name: newUser.name,
         email: newUser.email,
-        airtable_base_name: '',
-        created_at: new Date().toISOString()
+        userType: 'User',
+        airtable_base_name: newUser.airtableBaseName || '',
+        is_active: true
       });
 
       if (createdUser) {
@@ -270,8 +268,8 @@ export default function Management() {
         localStorage.setItem(`2FA_${newUser.username}`, 'false');
         localStorage.setItem(`vapiKey_${newUser.username}`, '');
 
-        // Initialize user settings in Supabase
-        await userService.setUserApiKey(newUser.username, '');
+        // Initialize user settings in MongoDB
+        await userService.setUserApiKey(newUser.username, 'vapi_key', '');
         await userService.set2FAStatus(newUser.username, false);
         
         setIsModalOpen(false);
@@ -284,8 +282,12 @@ export default function Management() {
 
   const handleUpdateUser = async (updatedUser: User) => {
     try {
-      // Update user in Supabase
-      await userService.updateUser(updatedUser.username, updatedUser);
+      // Update user in MongoDB
+      await userService.updateUser(updatedUser.username, {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        airtable_base_name: updatedUser.airtableBaseName || ''
+      });
 
       // Update localStorage
       const newUsers = users.map(u => 
@@ -302,13 +304,8 @@ export default function Management() {
   const handleDeleteUser = async (username: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        // Delete from Supabase (this will cascade to user_settings due to foreign key)
-        const { error } = await supabase
-          .from('users')
-          .delete()
-          .eq('username', username);
-
-        if (error) throw error;
+        // Delete from MongoDB (soft delete)
+        await userService.deleteUser(username);
 
         // Update localStorage
         saveUsers(users.filter(u => u.username !== username));
