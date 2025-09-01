@@ -2,44 +2,70 @@ import { useState, useEffect } from 'react';
 import { Settings, Trash2, Plus, X, Search, Clock, LogOut, Menu, ArrowLeft } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import SideMenu from './SideMenu';
-import { userService } from '../services/userService';
+import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services/authService';
 
 interface User {
+  _id: string;
+  username: string;
+  name: string;
+  email: string;
+  userType: 'Admin' | 'User';
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  last_login?: string;
+  settings: {
+    two_fa_enabled: boolean;
+    notifications_enabled: boolean;
+  };
+  apiKeys: {
+    vapi_key?: string;
+    openai_key?: string;
+    elevenlabs_key?: string;
+    deepgram_key?: string;
+  };
+}
+
+interface CreateUserData {
   username: string;
   password: string;
   name: string;
   email: string;
-  airtableBaseName: string;
-  createdAt: string;
+  userType: 'Admin' | 'User';
 }
 
 interface UserModalProps {
   user?: User;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (user: User) => void;
+  onSave: (userData: CreateUserData | Partial<User>) => void;
 }
 
 const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
-  const [formData, setFormData] = useState<User>({
+  const [formData, setFormData] = useState<CreateUserData>({
     username: '',
     password: '',
     name: '',
     email: '',
-    airtableBaseName: '',
-    createdAt: new Date().toISOString(),
+    userType: 'User',
   });
   const [errors, setErrors] = useState<{
     password?: string;
     email?: string;
     username?: string;
   }>({});
-  const isAdmin = localStorage.getItem('userName') === 'admin' && 
-                 localStorage.getItem('userPassword') === '12345';
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     if (user) {
-      setFormData(user);
+      setFormData({
+        username: user.username,
+        password: '', // Don't populate password for editing
+        name: user.name,
+        email: user.email,
+        userType: user.userType,
+      });
       setErrors({});
     } else {
       setFormData({
@@ -47,8 +73,7 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
         password: '',
         name: '',
         email: '',
-        airtableBaseName: '',
-        createdAt: new Date().toISOString(),
+        userType: 'User',
       });
     }
   }, [user, isOpen]);
@@ -67,22 +92,9 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Check for duplicate email and username
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    
-    if (!user) { // Only check for new users
-      if (existingUsers.some((u: User) => u.username === formData.username)) {
-        newErrors.username = 'Sorry unfortunately this username is already taken.';
-      }
-    }
-
-    // Check email duplicates (exclude current user when editing)
-    const emailExists = existingUsers.some((u: User) => 
-      u.email === formData.email && (!user || u.username !== user.username)
-    );
-    
-    if (emailExists) {
-      newErrors.email = 'The email address you entered is already associated with an existing account. Please use a different email address or log in to your account.';
+    // Username validation for new users
+    if (!user && !formData.username.trim()) {
+      newErrors.username = 'Username is required';
     }
 
     setErrors(newErrors);
@@ -137,6 +149,7 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 
                     ${errors.password ? 'border-red-300' : 'border-gray-300'}`}
+                  placeholder={user ? 'Leave blank to keep current password' : 'Enter password'}
                 />
                 {errors.password && (
                   <p className="mt-1 text-sm text-red-600">{errors.password}</p>
@@ -170,17 +183,19 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
               <p className="mt-1 text-sm text-red-600">{errors.email}</p>
             )}
           </div>
-          {isAdmin && (
+          {isAdmin() && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Airtable Base Name
+                User Type
               </label>
-              <input
-                type="text"
-                value={formData.airtableBaseName}
-                onChange={(e) => setFormData({ ...formData, airtableBaseName: e.target.value })}
+              <select
+                value={formData.userType}
+                onChange={(e) => setFormData({ ...formData, userType: e.target.value as 'Admin' | 'User' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-              />
+              >
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+              </select>
             </div>
           )}
         </div>
@@ -206,112 +221,112 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
 
 export default function Management() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | undefined>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-
+  // Load users from API
   useEffect(() => {
-    // Load users from localStorage
-    let storedUsers = localStorage.getItem('users');
-    if (!storedUsers) {
-      // Initialize with admin user if no users exist
-      const adminUser: User = {
-        username: 'admin',
-        password: '12345',
-        name: 'Administrator',
-        email: 'admin@example.com',
-        airtableBaseName: 'Sabos Account',
-        createdAt: new Date().toISOString()
-      };
-      storedUsers = JSON.stringify([adminUser]);
-      localStorage.setItem('users', storedUsers);
-    }
-    setUsers(JSON.parse(storedUsers));
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await authService.makeAuthenticatedRequest('http://localhost:3001/api/users');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        
+        const usersData = await response.json();
+        setUsers(usersData);
+      } catch (err) {
+        console.error('Error loading users:', err);
+        setError('Failed to load users');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
   }, []);
 
-  const saveUsers = (newUsers: User[]) => {
-    localStorage.setItem('users', JSON.stringify(newUsers));
-    setUsers(newUsers);
-  };
-
-  const handleCreateUser = async (newUser: User) => {
+  const handleCreateUser = async (userData: CreateUserData) => {
     try {
-      // Create user in MongoDB
-      const createdUser = await userService.createUser({
-        username: newUser.username,
-        password: newUser.password,
-        name: newUser.name,
-        email: newUser.email,
-        userType: 'User',
-        airtable_base_name: newUser.airtableBaseName || '',
-        is_active: true
+      setError(null);
+      const response = await authService.makeAuthenticatedRequest('http://localhost:3001/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(userData),
       });
 
-      if (createdUser) {
-        // Get existing users from localStorage
-        const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-        
-        // Create new user with 2FA disabled and no API key
-        const userToAdd = {
-          ...newUser,
-          createdAt: new Date().toISOString()
-        };
-        
-        // Save to localStorage
-        localStorage.setItem('users', JSON.stringify([...existingUsers, userToAdd]));
-        
-        // Set user-specific settings
-        localStorage.setItem(`2FA_${newUser.username}`, 'false');
-        localStorage.setItem(`vapiKey_${newUser.username}`, '');
-
-        // Initialize user settings in MongoDB
-        await userService.setUserApiKey(newUser.username, 'vapi_key', '');
-        await userService.set2FAStatus(newUser.username, false);
-        
-        setIsModalOpen(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create user');
       }
-    } catch (error) {
-      console.error('Error creating user:', error);
-      // Optionally show error to user
+
+      const newUser = await response.json();
+      setUsers(prev => [...prev, newUser]);
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Error creating user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create user');
     }
   };
 
-  const handleUpdateUser = async (updatedUser: User) => {
+  const handleUpdateUser = async (userData: Partial<User>) => {
+    if (!selectedUser) return;
+    
     try {
-      // Update user in MongoDB
-      await userService.updateUser(updatedUser.username, {
-        name: updatedUser.name,
-        email: updatedUser.email,
-        airtable_base_name: updatedUser.airtableBaseName || ''
-      });
-
-      // Update localStorage
-      const newUsers = users.map(u => 
-        u.username === updatedUser.username ? updatedUser : u
+      setError(null);
+      const response = await authService.makeAuthenticatedRequest(
+        `http://localhost:3001/api/users/${selectedUser.username}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: userData.name,
+            email: userData.email,
+          }),
+        }
       );
-      saveUsers(newUsers);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update user');
+      }
+
+      const updatedUser = await response.json();
+      setUsers(prev => prev.map(u => u.username === selectedUser.username ? updatedUser : u));
       setIsModalOpen(false);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      // Optionally show error to user
+    } catch (err) {
+      console.error('Error updating user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update user');
     }
   };
 
   const handleDeleteUser = async (username: string) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        // Delete from MongoDB (soft delete)
-        await userService.deleteUser(username);
+        setError(null);
+        const response = await authService.makeAuthenticatedRequest(
+          `http://localhost:3001/api/users/${username}`,
+          {
+            method: 'DELETE',
+          }
+        );
 
-        // Update localStorage
-        saveUsers(users.filter(u => u.username !== username));
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        // Optionally show error to user
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete user');
+        }
+
+        setUsers(prev => prev.filter(u => u.username !== username));
+      } catch (err) {
+        console.error('Error deleting user:', err);
+        setError(err instanceof Error ? err.message : 'Failed to delete user');
       }
     }
   };
@@ -324,8 +339,8 @@ export default function Management() {
       user.username.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
       return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
 
@@ -333,13 +348,34 @@ export default function Management() {
     setSortOrder(current => current === 'asc' ? 'desc' : 'asc');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userPassword');
-    localStorage.removeItem('currentUser');
-    navigate('/');
-    window.location.reload(); // Force reload to clear all states
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+      navigate('/login');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-600 text-center">
+          <p className="text-xl font-semibold mb-2">Error</p>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -431,9 +467,9 @@ export default function Management() {
                 <td className="px-6 py-4 whitespace-nowrap">{user.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{user.username}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{user.password}</td>
+                <td className="px-6 py-4 whitespace-nowrap">••••••••</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {new Date(user.createdAt).toLocaleDateString()}
+                  {new Date(user.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex justify-end space-x-2">
@@ -469,7 +505,13 @@ export default function Management() {
         user={selectedUser}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSave={selectedUser ? handleUpdateUser : handleCreateUser}
+        onSave={(userData) => {
+          if (selectedUser) {
+            handleUpdateUser(userData as Partial<User>);
+          } else {
+            handleCreateUser(userData as CreateUserData);
+          }
+        }}
       />
 
       <SideMenu 

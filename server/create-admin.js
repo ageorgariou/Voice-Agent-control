@@ -13,80 +13,89 @@ const client = new MongoClient(uri, {
   }
 });
 
-async function createAdminUser() {
+async function createPersistentAdminUser() {
   try {
     await client.connect();
+    console.log('✅ Connected to MongoDB');
+    
     const db = client.db(process.env.MONGODB_DB_NAME || 'voice_agent_db');
     const usersCollection = db.collection('users');
     
-    // Check if admin user already exists
-    const existingAdmin = await usersCollection.findOne({ username: 'admin' });
+    // Always ensure admin user exists with correct credentials
+    const adminUsername = 'admin';
+    const adminPassword = '12345';
     
-    if (existingAdmin) {
-      console.log('Admin user already exists');
-      console.log('Admin user details:', {
-        username: existingAdmin.username,
-        email: existingAdmin.email,
-        userType: existingAdmin.userType,
-        created_at: existingAdmin.created_at
-      });
-      
-      // Check if password needs to be updated (if it's not hashed)
-      const isPasswordHashed = existingAdmin.password.startsWith('$2b$');
-      if (!isPasswordHashed) {
-        console.log('Updating admin password to hashed version...');
-        const hashedPassword = await bcrypt.hash('12345', 12);
-        await usersCollection.updateOne(
-          { username: 'admin' },
-          { 
-            $set: { 
-              password: hashedPassword,
-              updated_at: new Date()
-            }
-          }
-        );
-        console.log('Admin password updated successfully');
-      } else {
-        console.log('Admin password is already properly hashed');
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(adminPassword, 12);
+    
+    const adminUser = {
+      username: adminUsername,
+      password: hashedPassword,
+      name: 'Administrator',
+      email: 'admin@voiceagentcontrol.com',
+      userType: 'Admin',
+      created_at: new Date(),
+      updated_at: new Date(),
+      is_active: true,
+      last_login: null,
+      settings: {
+        two_fa_enabled: false,
+        notifications_enabled: true
+      },
+      apiKeys: {
+        vapi_key: '',
+        openai_key: '',
+        elevenlabs_key: '',
+        deepgram_key: ''
       }
+    };
+    
+    // Use upsert to ensure admin always exists with correct data
+    const result = await usersCollection.replaceOne(
+      { username: adminUsername },
+      adminUser,
+      { upsert: true }
+    );
+    
+    if (result.upsertedCount > 0) {
+      console.log('✅ Admin user created successfully');
     } else {
-      console.log('Creating admin user...');
-      
-      // Hash the password
-      const hashedPassword = await bcrypt.hash('12345', 12);
-      
-      const adminUser = {
-        username: 'admin',
-        password: hashedPassword,
-        name: 'Administrator',
-        email: 'admin@voiceagentcontrol.com',
-        userType: 'Admin',
-        created_at: new Date(),
-        updated_at: new Date(),
-        is_active: true,
-        settings: {
-          two_fa_enabled: false,
-          notifications_enabled: true
-        },
-        apiKeys: {}
-      };
-      
-      const result = await usersCollection.insertOne(adminUser);
-      console.log('Admin user created successfully with ID:', result.insertedId);
+      console.log('✅ Admin user updated successfully');
     }
     
-    // List all users for verification
-    console.log('\nAll users in database:');
-    const allUsers = await usersCollection.find({}).toArray();
-    allUsers.forEach(user => {
-      console.log(`- ${user.username} (${user.userType}) - ${user.email}`);
+    // Verify admin user
+    const verifyAdmin = await usersCollection.findOne({ username: adminUsername });
+    console.log('✅ Admin user verified:', {
+      username: verifyAdmin.username,
+      email: verifyAdmin.email,
+      userType: verifyAdmin.userType,
+      is_active: verifyAdmin.is_active,
+      created_at: verifyAdmin.created_at
     });
     
+    // Test password verification
+    const isPasswordValid = await bcrypt.compare(adminPassword, verifyAdmin.password);
+    console.log('✅ Password verification:', isPasswordValid ? 'PASSED' : 'FAILED');
+    
+    // List all active users
+    console.log('\n📋 All active users in database:');
+    const allUsers = await usersCollection.find({ is_active: true }).toArray();
+    allUsers.forEach(user => {
+      console.log(`- ${user.username} (${user.userType}) - ${user.email} - Active: ${user.is_active}`);
+    });
+    
+    console.log('\n🎉 Admin user setup completed successfully!');
+    console.log('📝 Admin credentials:');
+    console.log('   Username: admin');
+    console.log('   Password: 12345');
+    
   } catch (error) {
-    console.error('Error:', error);
+    console.error('❌ Error:', error);
+    process.exit(1);
   } finally {
     await client.close();
+    console.log('🔌 MongoDB connection closed');
   }
 }
 
-createAdminUser();
+createPersistentAdminUser();

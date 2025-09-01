@@ -281,6 +281,63 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Admin-only endpoint to create users (for management panel)
+app.post('/api/admin/users', authenticateToken, requireAdmin, validateBody(validationSchemas.createUser), async (req, res) => {
+  try {
+    const userData = req.body;
+    const usersCollection = db.collection('users');
+    
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ username: userData.username });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    
+    // Check if email already exists
+    const existingEmail = await usersCollection.findOne({ email: userData.email });
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    
+    // Hash the password before storing
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+    
+    const newUser = {
+      ...userData,
+      password: hashedPassword,
+      userType: userData.userType || 'User', // Default to User if not specified
+      created_at: new Date(),
+      updated_at: new Date(),
+      is_active: true,
+      last_login: null,
+      settings: {
+        two_fa_enabled: false,
+        notifications_enabled: true,
+        ...userData.settings
+      },
+      apiKeys: {
+        vapi_key: '',
+        openai_key: '',
+        elevenlabs_key: '',
+        deepgram_key: '',
+        ...userData.apiKeys
+      }
+    };
+
+    const result = await usersCollection.insertOne(newUser);
+    const createdUser = await usersCollection.findOne({ _id: result.insertedId });
+    
+    // Remove password from response
+    const { password, ...userResponse } = createdUser;
+    
+    res.status(201).json(userResponse);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
 app.put('/api/users/:username/last-login', authenticateToken, requireOwnershipOrAdmin, validateParams(paramSchemas.username), async (req, res) => {
   try {
     const { username } = req.params;
