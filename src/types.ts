@@ -43,6 +43,11 @@ export interface User {
   email: string;
   userType: 'Admin' | 'User';
   airtable_base_name?: string;
+  features?: {
+    smsCampaigns?: boolean;
+    chatbotTranscripts?: boolean;
+    aiVideoGeneration?: boolean;
+  };
   apiKeys?: {
     vapi_key?: string;
     openai_key?: string;

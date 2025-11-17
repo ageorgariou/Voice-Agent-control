@@ -1,5 +1,6 @@
-import { X, Users, Settings, Home } from 'lucide-react';
+import { X, Users, Settings, Home, MessageSquare, MessageCircle, Video } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SideMenuProps {
   isOpen: boolean;
@@ -7,9 +8,14 @@ interface SideMenuProps {
 }
 
 export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
-  const isAdmin = localStorage.getItem('currentUser') ? 
-    JSON.parse(localStorage.getItem('currentUser') || '{}').username === 'admin' 
-    : false;
+  const { user } = useAuth();
+  const isAdmin = user?.userType === 'Admin';
+  
+  // Admins have access to all features by default
+  // Regular users need explicit feature access
+  const hasSMSCampaigns = isAdmin || user?.features?.smsCampaigns || false;
+  const hasChatbotTranscripts = isAdmin || user?.features?.chatbotTranscripts || false;
+  const hasAIVideoGeneration = isAdmin || user?.features?.aiVideoGeneration || false;
 
   return (
     <div
@@ -35,14 +41,36 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
             <Home className="h-5 w-5" />
             <span>Home</span>
           </Link>
-          <Link
-            to="/contact-manager"
-            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
-            onClick={onClose}
-          >
-            <Users className="h-5 w-5" />
-            <span>Contact Manager</span>
-          </Link>
+          {hasSMSCampaigns && (
+            <Link
+              to="/sms-campaigns"
+              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+              onClick={onClose}
+            >
+              <MessageSquare className="h-5 w-5" />
+              <span>SMS Campaigns</span>
+            </Link>
+          )}
+          {hasChatbotTranscripts && (
+            <Link
+              to="/chatbot-transcripts"
+              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+              onClick={onClose}
+            >
+              <MessageCircle className="h-5 w-5" />
+              <span>Chatbot Transcripts</span>
+            </Link>
+          )}
+          {hasAIVideoGeneration && (
+            <Link
+              to="/ai-video-generation"
+              className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+              onClick={onClose}
+            >
+              <Video className="h-5 w-5" />
+              <span>AI Video Generation</span>
+            </Link>
+          )}
           {isAdmin && (
             <Link
               to="/management"
@@ -53,6 +81,14 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
               <span>Management</span>
             </Link>
           )}
+          <Link
+            to="/contact-manager"
+            className="flex items-center space-x-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={onClose}
+          >
+            <Users className="h-5 w-5" />
+            <span>Contact Manager</span>
+          </Link>
         </nav>
       </div>
     </div>

@@ -33,6 +33,11 @@ interface CreateUserData {
   name: string;
   email: string;
   userType: 'Admin' | 'User';
+  features?: {
+    smsCampaigns?: boolean;
+    chatbotTranscripts?: boolean;
+    aiVideoGeneration?: boolean;
+  };
 }
 
 interface UserModalProps {
@@ -49,6 +54,11 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
     name: '',
     email: '',
     userType: 'User',
+    features: {
+      smsCampaigns: false,
+      chatbotTranscripts: false,
+      aiVideoGeneration: false,
+    },
   });
   const [errors, setErrors] = useState<{
     password?: string;
@@ -65,6 +75,11 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
         name: user.name,
         email: user.email,
         userType: user.userType,
+        features: user.features || {
+          smsCampaigns: false,
+          chatbotTranscripts: false,
+          aiVideoGeneration: false,
+        },
       });
       setErrors({});
     } else {
@@ -74,6 +89,11 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
         name: '',
         email: '',
         userType: 'User',
+        features: {
+          smsCampaigns: false,
+          chatbotTranscripts: false,
+          aiVideoGeneration: false,
+        },
       });
     }
   }, [user, isOpen]);
@@ -198,6 +218,58 @@ const UserModal = ({ user, isOpen, onClose, onSave }: UserModalProps) => {
               </select>
             </div>
           )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Feature Access
+            </label>
+            <div className="space-y-2">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.features?.smsCampaigns || false}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    features: {
+                      ...formData.features,
+                      smsCampaigns: e.target.checked,
+                    },
+                  })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">SMS Campaigns</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.features?.chatbotTranscripts || false}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    features: {
+                      ...formData.features,
+                      chatbotTranscripts: e.target.checked,
+                    },
+                  })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">Chatbot Transcripts</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.features?.aiVideoGeneration || false}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    features: {
+                      ...formData.features,
+                      aiVideoGeneration: e.target.checked,
+                    },
+                  })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700">AI Video Generation</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end space-x-3">

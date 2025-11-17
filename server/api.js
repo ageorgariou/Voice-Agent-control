@@ -307,6 +307,11 @@ app.post('/api/admin/users', authenticateToken, requireAdmin, validateBody(valid
       ...userData,
       password: hashedPassword,
       userType: userData.userType || 'User', // Default to User if not specified
+      features: userData.features || {
+        smsCampaigns: false,
+        chatbotTranscripts: false,
+        aiVideoGeneration: false,
+      },
       created_at: new Date(),
       updated_at: new Date(),
       is_active: true,

@@ -4,6 +4,9 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import ContactManager from './components/ContactManager';
 import Management from './components/Management';
+import SMSCampaigns from './components/SMSCampaigns';
+import ChatbotTranscripts from './components/ChatbotTranscripts';
+import AIVideoGeneration from './components/AIVideoGeneration';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -33,6 +36,30 @@ function App() {
             element={
               <ProtectedRoute requireAdmin={true}>
                 <Management />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/sms-campaigns" 
+            element={
+              <ProtectedRoute>
+                <SMSCampaigns />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/chatbot-transcripts" 
+            element={
+              <ProtectedRoute>
+                <ChatbotTranscripts />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/ai-video-generation" 
+            element={
+              <ProtectedRoute>
+                <AIVideoGeneration />
               </ProtectedRoute>
             } 
           />

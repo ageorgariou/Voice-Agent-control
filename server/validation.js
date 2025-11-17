@@ -84,6 +84,11 @@ export const validationSchemas = {
     name: commonSchemas.name.required(),
     email: commonSchemas.email.required(),
     userType: commonSchemas.userType,
+    features: Joi.object({
+      smsCampaigns: commonSchemas.boolean.optional(),
+      chatbotTranscripts: commonSchemas.boolean.optional(),
+      aiVideoGeneration: commonSchemas.boolean.optional()
+    }).optional(),
     settings: Joi.object({
       two_fa_enabled: commonSchemas.boolean,
       notifications_enabled: commonSchemas.boolean
@@ -101,6 +106,11 @@ export const validationSchemas = {
     name: commonSchemas.name.optional(),
     email: commonSchemas.email.optional(),
     userType: commonSchemas.userType.optional(),
+    features: Joi.object({
+      smsCampaigns: commonSchemas.boolean.optional(),
+      chatbotTranscripts: commonSchemas.boolean.optional(),
+      aiVideoGeneration: commonSchemas.boolean.optional()
+    }).optional(),
     settings: Joi.object({
       two_fa_enabled: commonSchemas.boolean,
       notifications_enabled: commonSchemas.boolean
