@@ -22,8 +22,8 @@ async function createPersistentAdminUser() {
     const usersCollection = db.collection('users');
     
     // Always ensure admin user exists with correct credentials
-    const adminUsername = 'admin';
-    const adminPassword = '12345';
+    const adminUsername = 'alex';
+    const adminPassword = '6934544241Aa!';
     
     // Hash the password
     const hashedPassword = await bcrypt.hash(adminPassword, 12);
@@ -31,8 +31,8 @@ async function createPersistentAdminUser() {
     const adminUser = {
       username: adminUsername,
       password: hashedPassword,
-      name: 'Administrator',
-      email: 'admin@voiceagentcontrol.com',
+      name: 'Alex',
+      email: 'alex@voiceagentcontrol.com',
       userType: 'Admin',
       created_at: new Date(),
       updated_at: new Date(),
@@ -86,8 +86,8 @@ async function createPersistentAdminUser() {
     
     console.log('\n🎉 Admin user setup completed successfully!');
     console.log('📝 Admin credentials:');
-    console.log('   Username: admin');
-    console.log('   Password: 12345');
+    console.log('   Username: alex');
+    console.log('   Password: 6934544241Aa!');
     
   } catch (error) {
     console.error('❌ Error:', error);

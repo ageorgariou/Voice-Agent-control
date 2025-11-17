@@ -365,23 +365,33 @@ app.post('/api/auth/login', validateBody(validationSchemas.login), async (req, r
   try {
     const { username, password } = req.body;
     
+    console.log(`[LOGIN] Attempting login for username: ${username}`);
+    
     const usersCollection = db.collection('users');
     const user = await usersCollection.findOne({ username, is_active: true });
     
     if (!user) {
+      console.log(`[LOGIN] User not found: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    console.log(`[LOGIN] User found: ${user.username}, userType: ${user.userType}`);
     
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password);
     
     if (!isValidPassword) {
+      console.log(`[LOGIN] Password verification failed for: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    console.log(`[LOGIN] Password verified successfully for: ${username}`);
     
     // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+    
+    console.log(`[LOGIN] Tokens generated for: ${username}`);
     
     // Update last login
     await usersCollection.updateOne(
@@ -397,6 +407,8 @@ app.post('/api/auth/login', validateBody(validationSchemas.login), async (req, r
     // Remove password from response
     const { password: _, ...userResponse } = user;
     
+    console.log(`[LOGIN] Login successful for: ${username}`);
+    
     res.json({ 
       message: 'Login successful',
       user: userResponse,
@@ -404,8 +416,9 @@ app.post('/api/auth/login', validateBody(validationSchemas.login), async (req, r
       refreshToken
     });
   } catch (error) {
-    console.error('Error during login:', error);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('[LOGIN] Error during login:', error);
+    console.error('[LOGIN] Error stack:', error.stack);
+    res.status(500).json({ error: 'Login failed', details: error.message });
   }
 });
 
@@ -475,7 +488,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const usersCollection = db.collection('users');
     const user = await usersCollection.findOne({ 
-      _id: req.user.userId, 
+      _id: new ObjectId(req.user.userId), 
       is_active: true 
     });
     

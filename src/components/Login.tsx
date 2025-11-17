@@ -46,8 +46,8 @@ export default function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <img 
-            src="/mrceeschatbot.png" 
-            alt="Voice Agent Control Logo" 
+            src="/logo.jpg" 
+            alt="Agenty Logo" 
             className="h-16 w-16 rounded-full bg-indigo-600 p-2"
           />
         </div>

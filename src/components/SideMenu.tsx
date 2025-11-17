@@ -24,7 +24,7 @@ export default function SideMenu({ isOpen, onClose }: SideMenuProps) {
 
         <nav className="mt-8 space-y-2">
           <div className="px-4 py-3 mb-4 bg-indigo-50 rounded-lg">
-            <span className="text-lg font-semibold text-indigo-600">mrceeschatbot</span>
+            <span className="text-lg font-semibold text-indigo-600">Agenty</span>
           </div>
 
           <Link

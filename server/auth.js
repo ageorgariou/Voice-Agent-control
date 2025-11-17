@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
+import { ObjectId } from 'mongodb';
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const refreshTokens = new Set();
  */
 export const generateAccessToken = (user) => {
   const payload = {
-    userId: user._id,
+    userId: user._id.toString ? user._id.toString() : user._id,
     username: user.username,
     userType: user.userType,
     email: user.email
@@ -35,7 +36,7 @@ export const generateAccessToken = (user) => {
  */
 export const generateRefreshToken = (user) => {
   const payload = {
-    userId: user._id,
+    userId: user._id.toString ? user._id.toString() : user._id,
     username: user.username,
     type: 'refresh'
   };
@@ -141,7 +142,7 @@ export const refreshAccessToken = async (refreshToken, usersCollection) => {
     
     // Get user from database
     const user = await usersCollection.findOne({ 
-      _id: decoded.userId, 
+      _id: new ObjectId(decoded.userId), 
       is_active: true 
     });
     
